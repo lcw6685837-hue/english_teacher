@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>꿀잼 구동사 마스터 V2.4 (완결판)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <style>
+        .card-flip { transition: transform 0.6s; transform-style: preserve-3d; }
+        .is-flipped { transform: rotateY(180deg); }
+        .card-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .card-back { transform: rotateY(180deg); }
+        .confetti { position: absolute; width: 10px; height: 10px; background-color: #f00; opacity: 0.7; animation: confetti-fall 2s ease-out forwards; }
+        @keyframes confetti-fall { 0% { transform: translateY(-100px) rotateZ(0deg); } 100% { transform: translateY(100vh) rotateZ(720deg); } }
+        .stage-btn.active { background-color: #2563EB; color: white; }
+
+        /* AI 선생님 말하기 효과 */
+        .teacher-avatar.speaking {
+            box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.8);
+            transition: box-shadow 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-blue-50 font-sans flex items-center justify-center min-h-screen py-8">
+
+    <div id="app" class="container mx-auto p-4 max-w-2xl">
+        <header class="text-center mb-6">
+            <h1 class="text-4xl font-extrabold text-blue-600">🚀 꿀잼 구동사 마스터 V2.4 🚀</h1>
+            <p class="text-gray-600 mt-2">AI 선생님과 함께 원어민에 도전하세요!</p>
+        </header>
+
+        <div class="flex justify-center gap-4 mb-6">
+            <button id="learn-mode-btn" class="px-6 py-2 bg-blue-500 text-white font-bold rounded-full shadow-lg transform hover:scale-105 transition duration-300">🎓 학습 모드</button>
+            <button id="quiz-mode-btn" class="px-6 py-2 bg-gray-300 text-gray-700 font-bold rounded-full shadow-lg transform hover:scale-105 transition duration-300">🧠 퀴즈 모드</button>
+        </div>
+
+        <!-- 스테이지 선택 영역 -->
+        <div id="stage-selection-container" class="mb-6">
+            <h2 class="text-center text-xl font-bold text-gray-700 mb-3">단계를 선택하세요</h2>
+            <div id="stage-buttons" class="flex flex-wrap justify-center gap-3">
+                <!-- 단계 버튼 동적 생성 -->
+            </div>
+        </div>
+
+        <!-- 학습 모드 화면 -->
+        <div id="learn-container" class="hidden">
+            <div id="card-container" class="relative h-[500px]">
+                <!-- 동적으로 카드 생성 -->
+            </div>
+            <div id="navigation" class="flex justify-between items-center mt-6">
+                <button id="prev-btn" class="px-5 py-2 bg-white text-blue-500 rounded-full shadow-md hover:bg-blue-100 transition"><i class="fas fa-arrow-left"></i> 이전</button>
+                <span id="card-counter" class="text-gray-600 font-semibold"></span>
+                <button id="next-btn" class="px-5 py-2 bg-white text-blue-500 rounded-full shadow-md hover:bg-blue-100 transition">다음 <i class="fas fa-arrow-right"></i></button>
+            </div>
+             <button id="back-to-stages-btn-learn" class="mt-4 w-full px-5 py-2 bg-gray-200 text-gray-700 rounded-full shadow-md hover:bg-gray-300 transition">단계 선택으로 돌아가기</button>
+        </div>
+
+        <!-- 퀴즈 모드 화면 -->
+        <div id="quiz-container" class="hidden">
+            <div id="quiz-card" class="bg-white rounded-xl shadow-2xl p-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="quiz-title" class="text-xl font-bold text-gray-700"></h2>
+                    <span id="quiz-progress" class="font-semibold text-blue-600"></span>
+                </div>
+                <div id="quiz-question" class="text-center text-2xl md:text-3xl font-bold my-8 text-blue-500 min-h-[80px]"></div>
+                <div id="quiz-options" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </div>
+        
+        <!-- 퀴즈 결과 화면 -->
+        <div id="result-container" class="hidden text-center bg-white rounded-xl shadow-2xl p-8 relative overflow-hidden">
+            <div id="confetti-container" class="absolute inset-0"></div>
+             <h2 class="text-3xl font-bold text-blue-600 mb-4">🎉 퀴즈 완료! 🎉</h2>
+            <p class="text-xl text-gray-700 mb-2">당신의 점수는...</p>
+            <p id="score" class="text-6xl font-extrabold text-yellow-500 mb-6"></p>
+            <p id="score-message" class="text-lg text-gray-600 mb-6"></p>
+            <button id="restart-quiz-btn" class="px-8 py-3 bg-blue-500 text-white font-bold rounded-full shadow-lg transform hover:scale-105 transition duration-300">다른 단계 도전하기 <i class="fas fa-redo"></i></button>
+        </div>
+    </div>
+
+    <script>
+        const learningStages = [
+            // Stage 1
+            { stage: 1, quizType: 'meaning', verbs: [
+                { phrasalVerb: "Get up", meaning: "일어나다", example: "I get up at 7 AM every morning.", image: "https://placehold.co/600x400/F59E0B/FFFFFF?text=Get+Up" },
+                { phrasalVerb: "Turn on", meaning: "켜다", example: "Can you turn on the light?", image: "https://placehold.co/600x400/EAB308/FFFFFF?text=Turn+On" },
+                { phrasalVerb: "Turn off", meaning: "끄다", example: "Please turn off the TV before you leave.", image: "https://placehold.co/600x400/84CC16/FFFFFF?text=Turn+Off" },
+                { phrasalVerb: "Put on", meaning: "입다", example: "Put on your coat, it's cold outside.", image: "https://placehold.co/600x400/22C55E/FFFFFF?text=Put+On" },
+                { phrasalVerb: "Take off", meaning: "벗다, 이륙하다", example: "Please take off your shoes.", image: "https://placehold.co/600x400/10B981/FFFFFF?text=Take+Off" },
+                { phrasalVerb: "Eat out", meaning: "외식하다", example: "Let's eat out tonight.", image: "https://placehold.co/600x400/6366F1/FFFFFF?text=Eat+Out" },
+                { phrasalVerb: "Give back", meaning: "돌려주다", example: "You need to give back the book you borrowed.", image: "https://placehold.co/600x400/8B5CF6/FFFFFF?text=Give+Back" },
+            ]},
+            // Stage 2
+            { stage: 2, quizType: 'meaning', verbs: [
+                { phrasalVerb: "Look for", meaning: "찾다", example: "I'm looking for my keys.", image: "https://placehold.co/600x400/F97316/FFFFFF?text=Look+For" },
+                { phrasalVerb: "Give up", meaning: "포기하다", example: "Don't give up on your dreams.", image: "https://placehold.co/600x400/EF4444/FFFFFF?text=Give+Up!" },
+                { phrasalVerb: "Find out", meaning: "알아내다", example: "I need to find out what time the movie starts.", image: "https://placehold.co/600x400/0EA5E9/FFFFFF?text=Find+Out" },
+                { phrasalVerb: "Go on", meaning: "계속하다", example: "The show must go on.", image: "https://placehold.co/600x400/3B82F6/FFFFFF?text=Go+On" },
+                { phrasalVerb: "Show up", meaning: "나타나다", example: "He finally showed up an hour late.", image: "https://placehold.co/600x400/D946EF/FFFFFF?text=Show+Up" },
+                { phrasalVerb: "Look up", meaning: "찾아보다 (사전 등)", example: "If you don't know the word, look it up in a dictionary.", image: "https://placehold.co/600x400/A855F7/FFFFFF?text=Look+Up" },
+                { phrasalVerb: "Pay back", meaning: "갚다", example: "I'll pay you back next week.", image: "https://placehold.co/600x400/D946EF/FFFFFF?text=Pay+Back" },
+            ]},
+            // Stage 3
+            { stage: 3, quizType: 'fill-in', verbs: [
+                { phrasalVerb: "Break down", meaning: "고장나다", example: "My car broke down on the highway.", image: "https://placehold.co/600x400/EC4899/FFFFFF?text=Break+Down" },
+                { phrasalVerb: "Hang out", meaning: "어울려 놀다", example: "We usually hang out at the park.", image: "https://placehold.co/600x400/14B8A6/FFFFFF?text=Hang+Out" },
+                { phrasalVerb: "Work out", meaning: "운동하다, 해결되다", example: "I work out at the gym three times a week.", image: "https://placehold.co/600x400/10B981/FFFFFF?text=Work+Out" },
+                { phrasalVerb: "Look forward to", meaning: "기대하다", example: "I'm looking forward to my vacation.", image: "https://placehold.co/600x400/6366F1/FFFFFF?text=Look+Forward+To" },
+                { phrasalVerb: "Fill out", meaning: "작성하다", example: "Please fill out this form.", image: "https://placehold.co/600x400/F59E0B/FFFFFF?text=Fill+Out" },
+                { phrasalVerb: "Warm up", meaning: "준비 운동하다", example: "It's important to warm up before exercising.", image: "https://placehold.co/600x400/EC4899/FFFFFF?text=Warm+Up" },
+                { phrasalVerb: "Back up", meaning: "후진하다, 백업하다", example: "You should back up your important files.", image: "https://placehold.co/600x400/06B6D4/FFFFFF?text=Back+Up" },
+            ]},
+            // Stage 4
+            { stage: 4, quizType: 'fill-in', verbs: [
+                { phrasalVerb: "Get along", meaning: "사이좋게 지내다", example: "I get along well with my coworkers.", image: "https://placehold.co/600x400/EAB308/FFFFFF?text=Get+Along" },
+                { phrasalVerb: "Ask out", meaning: "데이트 신청하다", example: "He's too shy to ask her out.", image: "https://placehold.co/600x400/14B8A6/FFFFFF?text=Ask+Out" },
+                { phrasalVerb: "Break up", meaning: "헤어지다", example: "They decided to break up after five years.", image: "https://placehold.co/600x400/0EA5E9/FFFFFF?text=Break+Up" },
+                { phrasalVerb: "Catch up", meaning: "따라잡다", example: "I need to catch up on my homework.", image: "https://placehold.co/600x400/3B82F6/FFFFFF?text=Catch+Up" },
+                { phrasalVerb: "Come across", meaning: "우연히 발견하다", example: "I came across an old photo while cleaning.", image: "https://placehold.co/600x400/EF4444/FFFFFF?text=Come+Across" },
+                { phrasalVerb: "Look after", meaning: "돌보다", example: "Can you look after my cat this weekend?", image: "https://placehold.co/600x400/6366F1/FFFFFF?text=Look+After" },
+                { phrasalVerb: "Make up", meaning: "화해하다, 꾸며내다", example: "They argued but made up quickly.", image: "https://placehold.co/600x400/8B5CF6/FFFFFF?text=Make+Up" },
+            ]},
+            // Stage 5
+            { stage: 5, quizType: 'fill-in', verbs: [
+                { phrasalVerb: "Go over", meaning: "검토하다", example: "Let's go over the plan one more time.", image: "https://placehold.co/600x400/22C55E/FFFFFF?text=Go+Over" },
+                { phrasalVerb: "Set up", meaning: "설치하다, 준비하다", example: "We need to set up the new computer.", image: "https://placehold.co/600x400/EC4899/FFFFFF?text=Set+Up" },
+                { phrasalVerb: "Think over", meaning: "곰곰이 생각하다", example: "I need some time to think it over.", image: "https://placehold.co/600x400/EF4444/FFFFFF?text=Think+Over" },
+                { phrasalVerb: "Log in", meaning: "로그인하다", example: "You need a password to log in.", image: "https://placehold.co/600x400/0EA5E9/FFFFFF?text=Log+In" },
+                { phrasalVerb: "Log out", meaning: "로그아웃하다", example: "Don't forget to log out when you're done.", image: "https://placehold.co/600x400/3B82F6/FFFFFF?text=Log+Out" },
+                { phrasalVerb: "Hand in", meaning: "제출하다", example: "You must hand in your report by Friday.", image: "https://placehold.co/600x400/10B981/FFFFFF?text=Hand+In" },
+                { phrasalVerb: "Write down", meaning: "적어두다", example: "Please write down your name and address.", image: "https://placehold.co/600x400/F97316/FFFFFF?text=Write+Down" },
+            ]},
+            // Stage 6
+            { stage: 6, quizType: 'fill-in', verbs: [
+                { phrasalVerb: "Drop off", meaning: "내려주다", example: "Can you drop me off at the station?", image: "https://placehold.co/600x400/F97316/FFFFFF?text=Drop+Off" },
+                { phrasalVerb: "Run out of", meaning: "~을 다 써버리다", example: "We've run out of milk, I need to buy some.", image: "https://placehold.co/600x400/A855F7/FFFFFF?text=Run+Out+Of" },
+                { phrasalVerb: "Turn down", meaning: "거절하다, 소리를 줄이다", example: "She turned down the job offer.", image: "https://placehold.co/600x400/EAB308/FFFFFF?text=Turn+Down" },
+                { phrasalVerb: "Turn up", meaning: "나타나다, 소리를 높이다", example: "Guess who turned up at the party?", image: "https://placehold.co/600x400/84CC16/FFFFFF?text=Turn+Up" },
+                { phrasalVerb: "Try on", meaning: "입어보다", example: "I'd like to try on these shoes, please.", image: "https://placehold.co/600x400/F59E0B/FFFFFF?text=Try+On" },
+                { phrasalVerb: "Throw away", meaning: "버리다", example: "Don't throw away that old newspaper.", image: "https://placehold.co/600x400/F97316/FFFFFF?text=Throw+Away" },
+                { phrasalVerb: "Take out", meaning: "꺼내다, 데리고 나가다", example: "He took me out for a fancy dinner.", image: "https://placehold.co/600x400/F43F5E/FFFFFF?text=Take+Out" },
+            ]},
+            // Stage 7
+            { stage: 7, quizType: 'definition', verbs: [
+                { phrasalVerb: "Put off", meaning: "미루다", example: "Never put off until tomorrow what you can do today.", image: "https://placehold.co/600x400/6366F1/FFFFFF?text=Put+Off" },
+                { phrasalVerb: "Get over", meaning: "극복하다", example: "It took him a long time to get over the flu.", image: "https://placehold.co/600x400/22C55E/FFFFFF?text=Get+Over" },
+                { phrasalVerb: "Bring up", meaning: "언급하다, 기르다", example: "Don't bring up that topic during dinner.", image: "https://placehold.co/600x400/14B8A6/FFFFFF?text=Bring+Up" },
+                { phrasalVerb: "Call off", meaning: "취소하다", example: "They had to call off the game because of the rain.", image: "https://placehold.co/600x400/06B6D4/FFFFFF?text=Call+Off" },
+                { phrasalVerb: "Cheer up", meaning: "기운 내다", example: "I bought you some flowers to cheer you up.", image: "https://placehold.co/600x400/F59E0B/FFFFFF?text=Cheer+Up" },
+                { phrasalVerb: "Hold on", meaning: "기다리다", example: "Hold on a second, I'll be right back.", image: "https://placehold.co/600x400/06B6D4/FFFFFF?text=Hold+On" },
+                { phrasalVerb: "Pass out", meaning: "기절하다", example: "He was so tired that he passed out on the sofa.", image: "https://placehold.co/600x400/8B5CF6/FFFFFF?text=Pass+Out" },
+            ]},
+            // Stage 8 - NEW
+            { stage: 8, quizType: 'definition', verbs: [
+                { phrasalVerb: "Figure out", meaning: "이해하다, 알아내다", example: "I can't figure out how to solve this problem.", image: "https://placehold.co/600x400/3B82F6/FFFFFF?text=Figure+Out" },
+                { phrasalVerb: "Carry out", meaning: "수행하다", example: "The team will carry out the research.", image: "https://placehold.co/600x400/10B981/FFFFFF?text=Carry+Out" },
+                { phrasalVerb: "Rule out", meaning: "배제하다", example: "Police have ruled out suicide.", image: "https://placehold.co/600x400/EF4444/FFFFFF?text=Rule+Out" },
+                { phrasalVerb: "Account for", meaning: "설명하다, 차지하다", example: "These new facts account for everything.", image: "https://placehold.co/600x400/F97316/FFFFFF?text=Account+For" },
+                { phrasalVerb: "Boil down to", meaning: "결국 ~이 되다", example: "The problem boils down to a lack of communication.", image: "https://placehold.co/600x400/0EA5E9/FFFFFF?text=Boil+Down+To" },
+                { phrasalVerb: "Touch on", meaning: "간단히 다루다", example: "The report touches on the issue of climate change.", image: "https://placehold.co/600x400/84CC16/FFFFFF?text=Touch+On" },
+                { phrasalVerb: "Adhere to", meaning: "고수하다, 지키다", example: "All members must adhere to the rules.", image: "https://placehold.co/600x400/6366F1/FFFFFF?text=Adhere+To" },
+            ]},
+            // Stage 9 - NEW
+            { stage: 9, quizType: 'fill-in', verbs: [
+                { phrasalVerb: "Run into", meaning: "우연히 만나다", example: "I ran into my old friend at the supermarket.", image: "https://placehold.co/600x400/EC4899/FFFFFF?text=Run+Into" },
+                { phrasalVerb: "Run over", meaning: "(차로) 치다", example: "Be careful not to run over the curb.", image: "https://placehold.co/600x400/EF4444/FFFFFF?text=Run+Over" },
+                { phrasalVerb: "Take after", meaning: "~를 닮다", example: "She really takes after her mother.", image: "https://placehold.co/600x400/D946EF/FFFFFF?text=Take+After" },
+                { phrasalVerb: "Take on", meaning: "떠맡다", example: "He will take on the role of team captain.", image: "https://placehold.co/600x400/14B8A6/FFFFFF?text=Take+On" },
+                { phrasalVerb: "Put up with", meaning: "참다, 견디다", example: "I can't put up with his rude behavior anymore.", image: "https://placehold.co/600x400/F59E0B/FFFFFF?text=Put+Up+With" },
+                { phrasalVerb: "Cut down on", meaning: "~을 줄이다", example: "I'm trying to cut down on sugar.", image: "https://placehold.co/600x400/84CC16/FFFFFF?text=Cut+Down+On" },
+                { phrasalVerb: "Fall apart", meaning: "무너지다, 망가지다", example: "The old book is falling apart.", image: "https://placehold.co/600x400/6B7280/FFFFFF?text=Fall+Apart" },
+            ]},
+            // Stage 10 - NEW
+            { stage: 10, quizType: 'definition', verbs: [
+                { phrasalVerb: "Brush up on", meaning: "~을 복습하다", example: "I need to brush up on my Spanish before my trip.", image: "https://placehold.co/600x400/06B6D4/FFFFFF?text=Brush+Up+On" },
+                { phrasalVerb: "Do away with", meaning: "~을 없애다, 폐지하다", example: "The school decided to do away with the old uniform.", image: "https://placehold.co/600x400/EF4444/FFFFFF?text=Do+Away+With" },
+                { phrasalVerb: "Fall through", meaning: "수포로 돌아가다", example: "Our travel plans fell through at the last minute.", image: "https://placehold.co/600x400/6B7280/FFFFFF?text=Fall+Through" },
+                { phrasalVerb: "Iron out", meaning: "(문제를) 해결하다", example: "We need to iron out a few details before the launch.", image: "https://placehold.co/600x400/3B82F6/FFFFFF?text=Iron+Out" },
+                { phrasalVerb: "Live up to", meaning: "~에 부응하다", example: "The movie didn't live up to my expectations.", image: "https://placehold.co/600x400/22C55E/FFFFFF?text=Live+Up+To" },
+                { phrasalVerb: "Stand for", meaning: "~을 상징하다", example: "What does 'NASA' stand for?", image: "https://placehold.co/600x400/0EA5E9/FFFFFF?text=Stand+For" },
+                { phrasalVerb: "Zero in on", meaning: "~에 집중하다", example: "The investigation will zero in on the main suspect.", image: "https://placehold.co/600x400/F97316/FFFFFF?text=Zero+In+On" },
+            ]},
+        ];
+
+        let currentMode = 'learn';
+        let currentStageIndex = 0;
+        let currentCardIndex = 0;
+        let quizQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+
+        const learnContainer = document.getElementById('learn-container');
+        const quizContainer = document.getElementById('quiz-container');
+        const resultContainer = document.getElementById('result-container');
+        const stageSelectionContainer = document.getElementById('stage-selection-container');
+        
+        function init() {
+            createStageButtons();
+            setupModeButtons();
+            setupNavigationButtons();
+            document.getElementById('restart-quiz-btn').addEventListener('click', showStageSelection);
+            document.getElementById('back-to-stages-btn-learn').addEventListener('click', showStageSelection);
+        }
+
+        function createStageButtons() {
+            const container = document.getElementById('stage-buttons');
+            container.innerHTML = '';
+            for (let i = 1; i <= 10; i++) {
+                const button = document.createElement('button');
+                button.className = 'stage-btn px-4 py-2 bg-white text-gray-600 font-semibold rounded-lg shadow hover:bg-blue-100 transition';
+                button.textContent = `Stage ${i}`;
+                
+                button.addEventListener('click', () => {
+                    const stageIndex = i - 1;
+                    if (stageIndex >= learningStages.length) {
+                        alert('해당 단계는 현재 준비 중입니다. Coming Soon!');
+                        return;
+                    }
+                    currentStageIndex = stageIndex;
+                    if (currentMode === 'learn') {
+                        startLearning();
+                    } else {
+                        startQuiz();
+                    }
+                });
+                container.appendChild(button);
+            }
+        }
+        
+        function updateActiveStageButton() {
+            document.querySelectorAll('.stage-btn').forEach((btn, index) => {
+                btn.classList.toggle('active', index === currentStageIndex);
+            });
+        }
+
+        function showStageSelection() {
+            stageSelectionContainer.classList.remove('hidden');
+            learnContainer.classList.add('hidden');
+            quizContainer.classList.add('hidden');
+            resultContainer.classList.add('hidden');
+        }
+
+        function startLearning() {
+            stageSelectionContainer.classList.add('hidden');
+            learnContainer.classList.remove('hidden');
+            updateActiveStageButton();
+            
+            const cardContainer = document.getElementById('card-container');
+            cardContainer.innerHTML = '';
+            const stageVerbs = learningStages[currentStageIndex].verbs;
+            stageVerbs.forEach((verb, index) => {
+                cardContainer.appendChild(createCard(verb, index));
+            });
+            currentCardIndex = 0;
+            updateLearnView();
+        }
+
+        function startQuiz() {
+            stageSelectionContainer.classList.add('hidden');
+            quizContainer.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+            updateActiveStageButton();
+            
+            const stageData = learningStages[currentStageIndex];
+            quizQuestions = [...stageData.verbs].sort(() => 0.5 - Math.random());
+            currentQuestionIndex = 0;
+            score = 0;
+            showQuizQuestion();
+        }
+
+        function setupModeButtons() {
+            const learnModeBtn = document.getElementById('learn-mode-btn');
+            const quizModeBtn = document.getElementById('quiz-mode-btn');
+            learnModeBtn.addEventListener('click', () => {
+                currentMode = 'learn';
+                showStageSelection();
+                learnModeBtn.classList.replace('bg-gray-300', 'bg-blue-500');
+                learnModeBtn.classList.replace('text-gray-700', 'text-white');
+                quizModeBtn.classList.replace('bg-blue-500', 'bg-gray-300');
+                quizModeBtn.classList.replace('text-white', 'text-gray-700');
+            });
+
+            quizModeBtn.addEventListener('click', () => {
+                currentMode = 'quiz';
+                showStageSelection();
+                quizModeBtn.classList.replace('bg-gray-300', 'bg-blue-500');
+                quizModeBtn.classList.replace('text-gray-700', 'text-white');
+                learnModeBtn.classList.replace('bg-blue-500', 'bg-gray-300');
+                learnModeBtn.classList.replace('text-white', 'text-gray-700');
+            });
+        }
+        
+        function speak(text, cardWrapper) {
+            speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+
+            const teacherAvatar = cardWrapper.querySelector('.teacher-avatar');
+
+            utterance.onstart = () => {
+                teacherAvatar.classList.add('speaking');
+            };
+            utterance.onend = () => {
+                teacherAvatar.classList.remove('speaking');
+            };
+            
+            speechSynthesis.speak(utterance);
+        }
+
+        function createCard(item, index) {
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = 'absolute w-full h-full card-flip hidden';
+            cardWrapper.dataset.index = index;
+
+            cardWrapper.innerHTML = `
+                <div class="card-face w-full h-full absolute">
+                    <div class="bg-white rounded-xl shadow-2xl overflow-hidden text-center h-full flex flex-col">
+                        <img src="${item.image}" alt="${item.phrasalVerb}" class="w-full h-64 object-cover" onerror="this.onerror=null;this.src='https://placehold.co/600x400/cccccc/FFFFFF?text=Image+Error';">
+                        <div class="p-6 flex-grow flex flex-col justify-center">
+                            <h2 class="text-5xl font-extrabold text-blue-600">${item.phrasalVerb}</h2>
+                            <p class="text-2xl text-gray-600 mt-2">${item.meaning}</p>
+                        </div>
+                        <button class="show-example-btn w-full py-3 bg-blue-500 text-white font-bold text-lg">AI 선생님 예문 보기 <i class="fas fa-comment-dots"></i></button>
+                    </div>
+                </div>
+                <div class="card-back card-face w-full h-full absolute">
+                    <div class="bg-blue-500 rounded-xl shadow-2xl p-6 h-full flex flex-col justify-center items-center relative">
+                        <h3 class="text-3xl font-bold text-white mb-4">${item.phrasalVerb}</h3>
+                        <div class="flex items-center w-full">
+                            <div class="w-1/3 flex justify-center">
+                                <img src="https://placehold.co/150x150/FFFFFF/3B82F6?text=AI+Teacher" alt="AI Teacher" class="teacher-avatar rounded-full border-4 border-white cursor-pointer transform hover:scale-110 transition">
+                            </div>
+                            <div class="w-2/3 text-left pl-4">
+                                <p class="text-xl md:text-2xl text-white italic">"${item.example}"</p>
+                            </div>
+                        </div>
+                        <button class="hide-example-btn absolute top-4 right-4 text-white text-2xl"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+            `;
+            
+            cardWrapper.querySelector('.show-example-btn').addEventListener('click', () => cardWrapper.classList.add('is-flipped'));
+            cardWrapper.querySelector('.hide-example-btn').addEventListener('click', () => {
+                cardWrapper.classList.remove('is-flipped');
+                speechSynthesis.cancel();
+            });
+            cardWrapper.querySelector('.teacher-avatar').addEventListener('click', (e) => {
+                e.stopPropagation();
+                speak(item.example, cardWrapper);
+            });
+            return cardWrapper;
+        }
+        
+        function updateLearnView() {
+            const stageVerbs = learningStages[currentStageIndex].verbs;
+            document.querySelectorAll('#card-container .card-flip').forEach((card, index) => {
+                const cardNode = card;
+                if(index === currentCardIndex && cardNode.classList.contains('is-flipped')) {
+                   cardNode.classList.remove('is-flipped');
+                   speechSynthesis.cancel();
+                }
+                cardNode.classList.toggle('hidden', index !== currentCardIndex);
+            });
+            document.getElementById('card-counter').textContent = `${currentCardIndex + 1} / ${stageVerbs.length}`;
+        }
+        
+        function setupNavigationButtons() {
+            document.getElementById('prev-btn').addEventListener('click', () => {
+                const stageVerbs = learningStages[currentStageIndex].verbs;
+                currentCardIndex = (currentCardIndex - 1 + stageVerbs.length) % stageVerbs.length;
+                updateLearnView();
+            });
+            
+            document.getElementById('next-btn').addEventListener('click', () => {
+                const stageVerbs = learningStages[currentStageIndex].verbs;
+                currentCardIndex = (currentCardIndex + 1) % stageVerbs.length;
+                updateLearnView();
+            });
+        }
+        
+        function showQuizQuestion() {
+            if (currentQuestionIndex >= quizQuestions.length) {
+                showResults(); return;
+            }
+            const questionData = quizQuestions[currentQuestionIndex];
+            const quizType = learningStages[currentStageIndex].quizType;
+            const questionEl = document.getElementById('quiz-question');
+            const optionsContainer = document.getElementById('quiz-options');
+            
+            document.getElementById('quiz-progress').textContent = `${currentQuestionIndex + 1} / ${quizQuestions.length}`;
+            optionsContainer.innerHTML = '';
+
+            let questionText, correctAnswer;
+            const allVerbs = learningStages.flatMap(stage => stage.verbs);
+
+            if (quizType === 'definition') {
+                document.getElementById('quiz-title').textContent = '다음 의미에 해당하는 구동사는?';
+                questionText = `"${questionData.meaning}"`;
+                correctAnswer = questionData.phrasalVerb;
+                const options = [correctAnswer];
+                while (options.length < 4) {
+                    const randomVerb = allVerbs[Math.floor(Math.random() * allVerbs.length)];
+                    if (!options.includes(randomVerb.phrasalVerb)) {
+                        options.push(randomVerb.phrasalVerb);
+                    }
+                }
+                options.sort(() => 0.5 - Math.random());
+                options.forEach(option => createOptionButton(option, correctAnswer));
+            } else if (quizType === 'fill-in') {
+                document.getElementById('quiz-title').textContent = '빈칸에 알맞은 구동사는?';
+                questionText = questionData.example.replace(questionData.phrasalVerb, '_______');
+                correctAnswer = questionData.phrasalVerb;
+                 const options = [correctAnswer];
+                 while (options.length < 4) {
+                    const randomVerb = allVerbs[Math.floor(Math.random() * allVerbs.length)];
+                    if (!options.includes(randomVerb.phrasalVerb)) {
+                        options.push(randomVerb.phrasalVerb);
+                    }
+                }
+                options.sort(() => 0.5 - Math.random());
+                 options.forEach(option => createOptionButton(option, correctAnswer));
+            } else { // 'meaning'
+                document.getElementById('quiz-title').textContent = '다음 구동사의 의미는?';
+                questionText = questionData.phrasalVerb;
+                correctAnswer = questionData.meaning;
+                const options = [correctAnswer];
+                while (options.length < 4) {
+                    const randomVerb = allVerbs[Math.floor(Math.random() * allVerbs.length)];
+                    if (!options.includes(randomVerb.meaning)) {
+                        options.push(randomVerb.meaning);
+                    }
+                }
+                options.sort(() => 0.5 - Math.random());
+                options.forEach(option => createOptionButton(option, correctAnswer));
+            }
+             questionEl.textContent = questionText;
+        }
+
+        function createOptionButton(option, correctAnswer) {
+            const optionsContainer = document.getElementById('quiz-options');
+            const button = document.createElement('button');
+            button.className = 'p-4 bg-gray-100 rounded-lg text-lg font-semibold text-gray-700 hover:bg-blue-200 hover:text-blue-700 transition duration-200';
+            button.textContent = option;
+            button.addEventListener('click', () => handleAnswer(option, correctAnswer, button));
+            optionsContainer.appendChild(button);
+        }
+
+        function handleAnswer(selected, correct, button) {
+             document.querySelectorAll('#quiz-options button').forEach(btn => btn.disabled = true);
+            if (selected === correct) {
+                score++;
+                button.classList.add('bg-green-500', 'text-white');
+            } else {
+                 button.classList.add('bg-red-500', 'text-white');
+                 document.querySelectorAll('#quiz-options button').forEach(btn => {
+                     if(btn.textContent.trim() === correct) {
+                        btn.classList.add('bg-green-500', 'text-white');
+                     }
+                 });
+            }
+            setTimeout(() => { currentQuestionIndex++; showQuizQuestion(); }, 1500);
+        }
+
+        function showResults() {
+            quizContainer.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+            const finalScore = (score / quizQuestions.length) * 100;
+            document.getElementById('score').textContent = `${finalScore}%`;
+            let message = "훌륭해요! 원어민에 한 걸음 더 다가갔어요!";
+            if (finalScore < 50) message = "조금 더 노력해볼까요? 다시 도전해보세요!";
+            else if (finalScore < 80) message = "좋은 점수예요! 복습하면 완벽해질 거예요.";
+            document.getElementById('score-message').textContent = message;
+
+            const confettiContainer = document.getElementById('confetti-container');
+            if(confettiContainer) {
+                confettiContainer.innerHTML = '';
+                if(finalScore > 80){
+                    for(let i = 0; i < 50; i++) {
+                        const confetti = document.createElement('div');
+                        confetti.className = 'confetti';
+                        confetti.style.left = Math.random() * 100 + 'vw';
+                        confetti.style.animationDelay = Math.random() * 2 + 's';
+                        confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                        confettiContainer.appendChild(confetti);
+                    }
+                }
+            }
+        }
+
+        init();
+        showStageSelection();
+    </script>
+</body>
+</html>
+
